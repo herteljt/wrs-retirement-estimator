@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WRS Retirement Benefit Estimator</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f2ee;
+    --surface: #ffffff;
+    --border: #d0c8bc;
+    --accent: #5c3d8f;
+    --accent2: #2d6a4f;
+    --text: #1a1614;
+    --muted: #6b5f52;
+    --warn: #8b4513;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    font-family: var(--sans);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  header {
+    background: var(--accent);
+    color: white;
+    padding: 20px 32px;
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+  }
+  header h1 { font-size: 1.25rem; font-weight: 600; letter-spacing: .02em; }
+  header span { font-family: var(--mono); font-size: .75rem; opacity: .7; }
+  .layout {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 0;
+    min-height: calc(100vh - 64px);
+  }
+  .inputs-panel {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 28px 24px;
+    overflow-y: auto;
+  }
+  .results-panel {
+    padding: 28px 28px;
+    overflow-y: auto;
+  }
+  .section-title {
+    font-family: var(--mono);
+    font-size: .65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--accent);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 6px;
+    margin-bottom: 16px;
+    margin-top: 24px;
+  }
+  .section-title:first-child { margin-top: 0; }
+  .field { margin-bottom: 14px; }
+  label {
+    display: block;
+    font-size: .78rem;
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  input, select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: .85rem;
+    background: #faf9f7;
+    color: var(--text);
+    transition: border-color .15s;
+  }
+  input:focus, select:focus {
+    outline: none;
+    border-color: var(--accent);
+    background: white;
+  }
+  .derived {
+    font-family: var(--mono);
+    font-size: .82rem;
+    color: var(--accent2);
+    background: #f0f7f4;
+    border: 1px solid #b7d5c8;
+    border-radius: 3px;
+    padding: 7px 10px;
+    min-height: 32px;
+  }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .hint { font-size: .7rem; color: var(--muted); margin-top: 3px; }
+  .calc-btn {
+    width: 100%;
+    margin-top: 20px;
+    padding: 12px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: .85rem;
+    font-weight: 600;
+    letter-spacing: .05em;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .calc-btn:hover { background: #4a3075; }
+
+  /* Results */
+  .result-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+  .result-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 16px;
+  }
+  .result-card.highlight {
+    border-color: var(--accent);
+    background: #f7f4fc;
+  }
+  .result-card .opt-label {
+    font-size: .7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .result-card .monthly {
+    font-family: var(--mono);
+    font-size: 1.6rem;
+    font-weight: 600;
+    color: var(--accent);
+  }
+  .result-card .annual {
+    font-family: var(--mono);
+    font-size: .8rem;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .result-card .method-tag {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: .65rem;
+    padding: 2px 6px;
+    border-radius: 2px;
+    background: #e8e3f5;
+    color: var(--accent);
+    margin-top: 8px;
+  }
+  .calc-steps {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 18px 20px;
+    margin-bottom: 20px;
+  }
+  .calc-steps h3 {
+    font-family: var(--mono);
+    font-size: .75rem;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .step-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 5px 0;
+    border-bottom: 1px dashed #e8e3da;
+    font-size: .82rem;
+  }
+  .step-row:last-child { border-bottom: none; font-weight: 600; }
+  .step-row .step-label { color: var(--muted); }
+  .step-row .step-val { font-family: var(--mono); color: var(--text); }
+  .step-row.total-row .step-val { color: var(--accent); font-size: .95rem; }
+  .warn-box {
+    background: #fdf6f0;
+    border: 1px solid #e8c5a0;
+    border-radius: 3px;
+    padding: 10px 14px;
+    font-size: .78rem;
+    color: var(--warn);
+    margin-bottom: 14px;
+  }
+  .placeholder-msg {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 300px;
+    color: var(--muted);
+    text-align: center;
+    gap: 8px;
+  }
+  .placeholder-msg svg { opacity: .3; }
+  .placeholder-msg p { font-size: .85rem; }
+  .table-wrap { overflow-x: auto; margin-bottom: 20px; }
+  table { width: 100%; border-collapse: collapse; font-size: .78rem; }
+  th {
+    font-family: var(--mono);
+    font-size: .65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--muted);
+    text-align: right;
+    padding: 6px 10px;
+    background: #faf9f7;
+    border-bottom: 1px solid var(--border);
+  }
+  th:first-child { text-align: left; }
+  td {
+    padding: 6px 10px;
+    text-align: right;
+    font-family: var(--mono);
+    border-bottom: 1px solid #ede8e1;
+  }
+  td:first-child { text-align: left; font-family: var(--sans); font-size: .8rem; color: var(--muted); }
+  tr.best-row td { background: #f0f7f4; color: var(--accent2); font-weight: 600; }
+  .age-range-note { font-size: .72rem; color: var(--muted); font-style: italic; margin-top: -10px; margin-bottom: 14px; }
+  .radio-group { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .radio-group label {
+    display: flex; align-items: center; gap: 5px;
+    font-family: var(--mono); font-size: .75rem;
+    color: var(--text); font-weight: 400;
+    cursor: pointer; padding: 5px 8px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: #faf9f7;
+    transition: all .12s;
+  }
+  .radio-group input[type=radio] { width: auto; margin: 0; }
+  .radio-group label:has(input:checked) {
+    background: #ede8f8;
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  @media (max-width: 820px) {
+    .layout { grid-template-columns: 1fr; }
+    .inputs-panel { border-right: none; border-bottom: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>WRS Retirement Benefit Estimator</h1>
+  <span>Wisconsin Retirement System · ET-4107</span>
+</header>
+
+<div class="layout">
+  <!-- INPUTS -->
+  <div class="inputs-panel">
+
+    <div class="section-title">Personal Info</div>
+
+    <div class="field">
+      <label>Date of Birth</label>
+      <input type="date" id="dob" oninput="autoCalc()">
+    </div>
+    <div class="field">
+      <label>Benefit Effective Date (planned retirement)</label>
+      <input type="date" id="retireDate" oninput="autoCalc()">
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Current Age</label>
+        <div class="derived" id="derivedAge">—</div>
+      </div>
+      <div class="field">
+        <label>Age at Retirement</label>
+        <div class="derived" id="derivedRetireAge">—</div>
+      </div>
+    </div>
+
+    <div class="section-title">Employment Category</div>
+    <div class="field">
+      <label>Category</label>
+      <select id="empCat" onchange="autoCalc()">
+        <option value="general">General / Teacher / Ed Support</option>
+        <option value="protective_ss">Protective with Social Security (police, deputies)</option>
+        <option value="protective_no_ss">Protective without Social Security (firefighters)</option>
+        <option value="elected_pre2017">Elected/Executive/Judge — began before Jan 1, 2017</option>
+        <option value="elected_post2017">Elected/Executive/Judge — began after Dec 31, 2016</option>
+      </select>
+    </div>
+
+    <div class="section-title">Service</div>
+    <div class="field">
+      <label>WRS Start Date</label>
+      <input type="date" id="wrsStart" oninput="autoCalc()">
+    </div>
+    <div class="field">
+      <label>Years of Creditable Service (override)</label>
+      <input type="number" id="serviceYears" min="0" max="50" step="0.5" placeholder="Auto-calculated from dates" oninput="autoCalc()">
+      <div class="hint">Leave blank to calculate from WRS start → retirement date</div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Pre-2000 Service (yrs)</label>
+        <input type="number" id="pre2000" min="0" step="0.5" placeholder="0" oninput="autoCalc()">
+      </div>
+      <div class="field">
+        <label>Post-1999 Service (yrs)</label>
+        <input type="number" id="post1999" min="0" step="0.5" placeholder="0" oninput="autoCalc()">
+      </div>
+    </div>
+    <div class="hint" style="margin-top:-10px;margin-bottom:12px;">If you only entered total service above, split it here. Post-Act 10 only applies to Elected/Executive category.</div>
+    <div class="field">
+      <label>Post-Act 10 Service (yrs) — Elected/Executive only</label>
+      <input type="number" id="postAct10" min="0" step="0.5" placeholder="0" oninput="autoCalc()">
+    </div>
+
+    <div class="section-title">Earnings</div>
+    <div class="field">
+      <label>Calculation Method</label>
+      <div class="radio-group" id="earningsMethod">
+        <label><input type="radio" name="earningsMethod" value="salary" checked onchange="toggleEarnings()"> Enter salary</label>
+        <label><input type="radio" name="earningsMethod" value="fam" onchange="toggleEarnings()"> Enter FAM directly</label>
+      </div>
+    </div>
+    <div id="salaryFields">
+      <div class="field">
+        <label>Annual Salary (highest 3-year average)</label>
+        <input type="number" id="annualSalary" min="0" step="1000" placeholder="e.g. 75000" oninput="autoCalc()">
+        <div class="hint">Tool assumes full-time (1.0 FTE) for all 3 years — adjust FAM manually if part-time</div>
+      </div>
+      <div class="field">
+        <label>Final Average Monthly Earnings (derived)</label>
+        <div class="derived" id="derivedFAM">—</div>
+      </div>
+    </div>
+    <div id="famField" style="display:none">
+      <div class="field">
+        <label>Final Average Monthly Earnings</label>
+        <input type="number" id="manualFAM" min="0" step="100" placeholder="e.g. 6250" oninput="autoCalc()">
+      </div>
+    </div>
+
+    <div class="section-title">Variable Fund</div>
+    <div class="field">
+      <label>Variable Excess / (Deficit) — from Statement of Benefits</label>
+      <input type="number" id="variableBalance" step="100" placeholder="0 if not participating" oninput="autoCalc()">
+    </div>
+
+    <div class="section-title">Annuity Option</div>
+    <div class="field">
+      <label>Payment Option</label>
+      <select id="annuityOption" onchange="toggleSurvivorAge()">
+        <option value="life_only">For Annuitant's Life Only</option>
+        <option value="g60">Life Annuity — 60 Payments Guaranteed</option>
+        <option value="g180">Life Annuity — 180 Payments Guaranteed</option>
+        <option value="js75">Joint &amp; Survivor — 75% Continued</option>
+        <option value="js100">Joint &amp; Survivor — 100% Continued</option>
+        <option value="js_reduced25">Joint &amp; Survivor — Reduced 25% on Either Death</option>
+        <option value="js100g180">Joint &amp; Survivor — 100% + 180 Payments Guaranteed</option>
+      </select>
+    </div>
+    <div id="survivorAgeField" style="display:none">
+      <div class="field">
+        <label>Named Survivor Date of Birth</label>
+        <input type="date" id="survivorDOB" oninput="autoCalc()">
+      </div>
+      <div class="field">
+        <label>Survivor Age at Your Retirement</label>
+        <div class="derived" id="derivedSurvivorAge">—</div>
+      </div>
+    </div>
+
+    <button class="calc-btn" onclick="calculate()">Calculate Benefit →</button>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="results-panel" id="resultsPanel">
+    <div class="placeholder-msg">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+      <p>Enter your information and click <strong>Calculate Benefit</strong></p>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Lookup tables ──────────────────────────────────────────────────────────
+
+// Age Reduction Factors: General/Teachers/Elected-post2016
+// arf[serviceRow][ageCol]  service rows: 5..30+, age cols: 55..65
+const ARF_GENERAL = {
+  5:  [.584,.632,.680,.720,.704,.760,.752,.800,.840,.880,.920,.960,1.000],
+  6:  [.597,.645,.693,.731,.712,.770,.760,.808,.846,.885,.923,.962,1.000],
+  7:  [.610,.658,.706,.742,.720,.779,.768,.816,.853,.890,.926,.963,1.000],
+  8:  [.622,.670,.718,.754,.728,.789,.776,.824,.859,.894,.930,.965,1.000],
+  9:  [.635,.683,.731,.765,.736,.798,.784,.832,.866,.899,.933,.966,1.000],
+  10: [.648,.696,.744,.776,.744,.808,.792,.840,.872,.904,.936,.968,1.000],
+  11: [.661,.709,.757,.787,.752,.818,.800,.848,.878,.909,.939,.970,1.000],
+  12: [.674,.722,.770,.798,.760,.827,.808,.856,.885,.914,.942,.971,1.000],
+  13: [.686,.734,.782,.810,.768,.837,.816,.864,.891,.918,.946,.973,1.000],
+  14: [.699,.747,.795,.821,.776,.846,.824,.872,.898,.923,.949,.974,1.000],
+  15: [.712,.760,.808,.832,.784,.856,.832,.880,.904,.928,.952,.976,1.000],
+  16: [.725,.773,.821,.843,.792,.866,.840,.888,.910,.933,.955,.978,1.000],
+  17: [.738,.786,.834,.854,.800,.875,.848,.896,.917,.938,.958,.979,1.000],
+  18: [.750,.798,.846,.866,.808,.885,.856,.904,.923,.942,.962,.981,1.000],
+  19: [.763,.811,.859,.877,.816,.894,.864,.912,.930,.947,.965,.982,1.000],
+  20: [.776,.824,.872,.888,.824,.904,.872,.920,.936,.952,.968,.984,1.000],
+  21: [.789,.837,.885,.899,.832,.914,.880,.928,.942,.957,.971,.986,1.000],
+  22: [.802,.850,.898,.910,.840,.923,.888,.936,.949,.962,.974,.987,1.000],
+  23: [.814,.862,.910,.922,.848,.933,.896,.944,.955,.966,.978,.989,1.000],
+  24: [.827,.875,.923,.933,.856,.942,.904,.952,.962,.971,.981,.990,1.000],
+  25: [.840,.888,.936,.944,.864,.952,.912,.960,.968,.976,.984,.992,1.000],
+  26: [.853,.901,.949,.955,.872,.962,.920,.968,.974,.981,.987,.994,1.000],
+  27: [.866,.914,.962,.966,.880,.971,.928,.976,.981,.986,.990,.995,1.000],
+  28: [.878,.926,.974,.978,.888,.981,.936,.984,.987,.990,.994,.997,1.000],
+  29: [.891,.939,.987,.989,.896,.990,.944,.992,.994,.995,.997,.998,1.000],
+  30: [.904,.952,1.000,1.000,.904,1.000,.952,1.000,1.000,1.000,1.000,1.000,1.000]
+};
+// cols correspond to ages: 55,56,57,58,58.5(between57-58 area),59... 
+// The PDF table has dual col for 58-59 range (two sub-columns). 
+// Simplified: cols index = age - 55, for ages 55..65, but PDF has 13 cols (55,56,57,58,58-59col,59,60,61,62,63,64,65)
+// Let's re-map simply as integer ages 55-65 using the clean right-hand values:
+const ARF_CLEAN = {
+  5:  {55:.584,56:.632,57:.680,58:.720,59:.760,60:.800,61:.840,62:.880,63:.920,64:.960,65:1.000},
+  6:  {55:.597,56:.645,57:.693,58:.731,59:.770,60:.808,61:.846,62:.885,63:.923,64:.962,65:1.000},
+  7:  {55:.610,56:.658,57:.706,58:.742,59:.779,60:.816,61:.853,62:.890,63:.926,64:.963,65:1.000},
+  8:  {55:.622,56:.670,57:.718,58:.754,59:.789,60:.824,61:.859,62:.894,63:.930,64:.965,65:1.000},
+  9:  {55:.635,56:.683,57:.731,58:.765,59:.798,60:.832,61:.866,62:.899,63:.933,64:.966,65:1.000},
+  10: {55:.648,56:.696,57:.744,58:.776,59:.808,60:.840,61:.872,62:.904,63:.936,64:.968,65:1.000},
+  11: {55:.661,56:.709,57:.757,58:.787,59:.818,60:.848,61:.878,62:.909,63:.939,64:.970,65:1.000},
+  12: {55:.674,56:.722,57:.770,58:.798,59:.827,60:.856,61:.885,62:.914,63:.942,64:.971,65:1.000},
+  13: {55:.686,56:.734,57:.782,58:.810,59:.837,60:.864,61:.891,62:.918,63:.946,64:.973,65:1.000},
+  14: {55:.699,56:.747,57:.795,58:.821,59:.846,60:.872,61:.898,62:.923,63:.949,64:.974,65:1.000},
+  15: {55:.712,56:.760,57:.808,58:.832,59:.856,60:.880,61:.904,62:.928,63:.952,64:.976,65:1.000},
+  16: {55:.725,56:.773,57:.821,58:.843,59:.866,60:.888,61:.910,62:.933,63:.955,64:.978,65:1.000},
+  17: {55:.738,56:.786,57:.834,58:.854,59:.875,60:.896,61:.917,62:.938,63:.958,64:.979,65:1.000},
+  18: {55:.750,56:.798,57:.846,58:.866,59:.885,60:.904,61:.923,62:.942,63:.962,64:.981,65:1.000},
+  19: {55:.763,56:.811,57:.859,58:.877,59:.894,60:.912,61:.930,62:.947,63:.965,64:.982,65:1.000},
+  20: {55:.776,56:.824,57:.872,58:.888,59:.904,60:.920,61:.936,62:.952,63:.968,64:.984,65:1.000},
+  21: {55:.789,56:.837,57:.885,58:.899,59:.914,60:.928,61:.942,62:.957,63:.971,64:.986,65:1.000},
+  22: {55:.802,56:.850,57:.898,58:.910,59:.923,60:.936,61:.949,62:.962,63:.974,64:.987,65:1.000},
+  23: {55:.814,56:.862,57:.910,58:.922,59:.933,60:.944,61:.955,62:.966,63:.978,64:.989,65:1.000},
+  24: {55:.827,56:.875,57:.923,58:.933,59:.942,60:.952,61:.962,62:.971,63:.981,64:.990,65:1.000},
+  25: {55:.840,56:.888,57:.936,58:.944,59:.952,60:.960,61:.968,62:.976,63:.984,64:.992,65:1.000},
+  26: {55:.853,56:.901,57:.949,58:.955,59:.962,60:.968,61:.974,62:.981,63:.987,64:.994,65:1.000},
+  27: {55:.866,56:.914,57:.962,58:.966,59:.971,60:.976,61:.981,62:.986,63:.990,64:.995,65:1.000},
+  28: {55:.878,56:.926,57:.974,58:.978,59:.981,60:.984,61:.987,62:.990,63:.994,64:.997,65:1.000},
+  29: {55:.891,56:.939,57:.987,58:.989,59:.990,60:.992,61:.994,62:.995,63:.997,64:.998,65:1.000},
+  30: {55:.904,56:.952,57:1.000,58:1.000,59:1.000,60:1.000,61:1.000,62:1.000,63:1.000,64:1.000,65:1.000}
+};
+
+function getARF(serviceYears, ageAtRetirement, category) {
+  // Protective category
+  if (category === 'protective_ss' || category === 'protective_no_ss') {
+    if (ageAtRetirement >= 54) return 1.0;
+    const has25 = serviceYears >= 25;
+    const table = {
+      50: has25 ? .856 : .808,
+      51: has25 ? .904 : .856,
+      52: has25 ? .952 : .904,
+      53: has25 ? 1.000 : .952,
+      54: 1.000
+    };
+    const age = Math.min(54, Math.max(50, Math.floor(ageAtRetirement)));
+    return table[age] || 1.0;
+  }
+  // Elected pre-2017: normal retirement age is 62
+  // General/Elected-post2016: normal retirement age is 65
+  const normalAge = (category === 'elected_pre2017') ? 62 : 65;
+  if (ageAtRetirement >= normalAge) return 1.0;
+
+  // For formula calculations, use min(actual age, 62) for non-protective
+  const lookupAge = Math.min(Math.floor(ageAtRetirement), 62);
+  if (lookupAge < 55) {
+    // Below 55 — same reduction as 55 but add extra for ages below
+    // Per spec: 0.4%/month below normal. Approximate via 55 value * extra reduction
+    const atFiftyFive = getARFAtAge(serviceYears, 55, category);
+    const extraMonths = (55 - ageAtRetirement) * 12;
+    return Math.max(0, atFiftyFive - extraMonths * 0.004);
+  }
+  return getARFAtAge(serviceYears, lookupAge, category);
+}
+
+function getARFAtAge(serviceYears, age, category) {
+  const normalAge = (category === 'elected_pre2017') ? 62 : 65;
+  if (age >= normalAge) return 1.0;
+  const svcKey = serviceYears >= 30 ? 30 : Math.max(5, Math.floor(serviceYears));
+  const row = ARF_CLEAN[svcKey] || ARF_CLEAN[30];
+  const clampedAge = Math.min(65, Math.max(55, age));
+  return row[clampedAge] ?? 1.0;
+}
+
+// Formula multipliers
+function getMultipliers(category) {
+  switch(category) {
+    case 'general':           return {pre2000: 0.01765, post1999: 0.016,  postAct10: 0};
+    case 'protective_ss':     return {pre2000: 0.02165, post1999: 0.020,  postAct10: 0};
+    case 'protective_no_ss':  return {pre2000: 0.02665, post1999: 0.025,  postAct10: 0};
+    case 'elected_pre2017':   return {pre2000: 0.02165, post1999: 0.020,  postAct10: 0.016};
+    case 'elected_post2017':  return {pre2000: 0.02165, post1999: 0.020,  postAct10: 0.016};
+    default:                  return {pre2000: 0.01765, post1999: 0.016,  postAct10: 0};
+  }
+}
+
+// Money purchase factors (Table 2)
+const MP_FACTOR = {
+  50:.00506,51:.00511,52:.00517,53:.00524,54:.00531,55:.00538,56:.00545,57:.00553,
+  58:.00562,59:.00571,60:.00581,61:.00591,62:.00602,63:.00614,64:.00627,65:.00641,
+  66:.00656,67:.00673,68:.00691,69:.00710,70:.00731,71:.00754,72:.00780,73:.00807,
+  74:.00837,75:.00870,76:.00906,77:.00946,78:.00989,79:.01037,80:.01089
+};
+
+// Option conversion factors
+// Life guaranteed tables
+const OCF_G60_NP  = {55:.998,56:.998,57:.998,58:.998,59:.997,60:.997,61:.997,62:.996,63:.996,64:.996,65:.995,66:.994,67:.994,68:.993,69:.992,70:.990};
+const OCF_G180_NP = {55:.985,56:.983,57:.982,58:.980,59:.977,60:.975,61:.972,62:.968,63:.964,64:.960,65:.955,66:.948,67:.941,68:.933,69:.924,70:.913};
+
+// JS 75%
+const OCF_JS75 = buildJSTable([
+  [45,.936,.930,.923,.916,.909,.901,.892,.884,.874,.864,.854,.843,.832,.819,.807,.793,.779,.764,.749,.733,.716],
+  [47,.942,.936,.930,.923,.916,.908,.900,.891,.882,.873,.863,.852,.840,.828,.816,.802,.788,.774,.758,.742,.725],
+  [49,.947,.942,.936,.930,.923,.916,.908,.900,.891,.881,.872,.861,.850,.838,.825,.812,.798,.784,.768,.752,.735],
+  [51,.953,.948,.942,.937,.930,.923,.916,.908,.900,.891,.881,.871,.860,.848,.836,.823,.809,.794,.779,.763,.746],
+  [53,.958,.954,.949,.943,.937,.931,.924,.916,.908,.900,.891,.881,.870,.859,.847,.834,.820,.806,.791,.775,.758],
+  [55,.963,.959,.955,.950,.944,.938,.932,.925,.917,.909,.900,.891,.881,.870,.858,.846,.832,.818,.803,.787,.770],
+  [57,.968,.964,.960,.956,.951,.945,.939,.933,.926,.919,.910,.901,.892,.881,.870,.858,.845,.831,.816,.801,.784],
+  [59,.972,.969,.965,.961,.957,.952,.947,.941,.935,.928,.920,.912,.903,.893,.882,.871,.858,.845,.830,.815,.799],
+  [61,.976,.973,.970,.966,.962,.958,.954,.948,.943,.936,.929,.922,.913,.904,.894,.883,.872,.859,.845,.830,.814],
+  [63,.979,.977,.974,.971,.968,.964,.960,.955,.950,.945,.938,.932,.924,.916,.906,.896,.885,.873,.860,.846,.830],
+  [65,.982,.980,.978,.975,.972,.969,.966,.962,.957,.952,.947,.941,.934,.926,.918,.909,.899,.887,.875,.861,.847]
+]);
+
+// JS 100%
+const OCF_JS100 = buildJSTable([
+  [45,.916,.908,.900,.891,.882,.872,.861,.851,.839,.827,.814,.801,.787,.773,.758,.742,.726,.709,.691,.673,.654],
+  [47,.924,.916,.908,.900,.891,.881,.871,.860,.849,.837,.825,.812,.798,.784,.769,.753,.736,.719,.702,.683,.664],
+  [49,.931,.924,.917,.908,.900,.891,.881,.871,.860,.848,.836,.823,.809,.795,.780,.764,.748,.731,.713,.694,.675],
+  [51,.938,.932,.925,.917,.909,.900,.891,.881,.870,.859,.847,.835,.821,.807,.792,.777,.760,.743,.725,.707,.688],
+  [53,.945,.939,.933,.926,.918,.910,.901,.892,.882,.871,.859,.847,.834,.820,.806,.790,.774,.757,.739,.720,.701],
+  [55,.952,.946,.940,.934,.927,.919,.911,.902,.893,.883,.872,.860,.847,.834,.819,.804,.788,.771,.754,.735,.716],
+  [57,.958,.953,.947,.942,.935,.928,.921,.913,.904,.894,.884,.873,.861,.848,.834,.819,.803,.787,.769,.751,.731],
+  [59,.963,.959,.954,.949,.943,.937,.930,.923,.915,.906,.896,.886,.874,.862,.849,.835,.819,.803,.786,.768,.748],
+  [61,.968,.964,.960,.956,.951,.945,.939,.932,.925,.917,.908,.898,.888,.876,.864,.850,.836,.820,.803,.785,.767],
+  [63,.973,.969,.966,.962,.957,.952,.947,.941,.935,.928,.920,.911,.901,.891,.879,.866,.852,.837,.821,.804,.786],
+  [65,.977,.974,.971,.967,.963,.959,.955,.950,.944,.937,.930,.923,.914,.904,.894,.882,.869,.855,.840,.823,.806]
+]);
+
+// JS Reduced 25%
+const OCF_JS_R25 = buildJSTable([
+  [45,.945,.938,.931,.924,.916,.907,.898,.889,.879,.869,.858,.847,.835,.823,.810,.796,.782,.767,.751,.735,.718],
+  [47,.953,.947,.940,.932,.924,.916,.908,.899,.889,.879,.868,.857,.845,.833,.820,.806,.792,.777,.761,.744,.727],
+  [49,.962,.956,.949,.942,.934,.926,.917,.909,.899,.889,.879,.867,.856,.843,.830,.817,.802,.787,.771,.755,.738],
+  [51,.971,.965,.958,.951,.944,.936,.928,.919,.910,.900,.890,.879,.867,.855,.842,.828,.814,.799,.783,.767,.749],
+  [53,.980,.974,.968,.961,.954,.947,.939,.930,.921,.912,.902,.891,.880,.867,.855,.841,.827,.812,.796,.779,.762],
+  [55,.990,.984,.978,.972,.965,.958,.950,.942,.934,.924,.914,.904,.893,.881,.868,.855,.841,.826,.810,.793,.776],
+  [57,.999,.994,.989,.983,.976,.969,.962,.954,.946,.937,.928,.917,.907,.895,.883,.869,.855,.841,.825,.808,.791],
+  [59,1.009,1.005,.999,.994,.988,.981,.974,.967,.959,.951,.941,.932,.921,.910,.898,.885,.871,.857,.841,.825,.807],
+  [61,1.020,1.015,1.010,1.005,1.000,.993,.987,.980,.973,.965,.956,.946,.936,.926,.914,.901,.888,.874,.859,.842,.825],
+  [63,1.031,1.027,1.022,1.017,1.012,1.006,1.000,.994,.987,.979,.971,.962,.952,.942,.931,.919,.906,.892,.877,.861,.845],
+  [65,1.043,1.039,1.034,1.030,1.025,1.019,1.014,1.008,1.001,.994,.986,.978,.969,.959,.949,.937,.925,.912,.897,.882,.865]
+]);
+
+// JS 100% + 180 guaranteed
+const OCF_JS100G180 = buildJSTable([
+  [45,.916,.908,.900,.891,.882,.872,.861,.850,.839,.827,.814,.801,.787,.773,.758,.742,.726,.708,.691,.672,.653],
+  [47,.924,.916,.908,.900,.891,.881,.871,.860,.849,.837,.825,.811,.798,.783,.768,.752,.736,.719,.701,.683,.663],
+  [49,.931,.924,.916,.908,.900,.890,.881,.870,.859,.848,.835,.823,.809,.795,.780,.764,.747,.730,.712,.694,.674],
+  [51,.938,.932,.925,.917,.909,.900,.891,.881,.870,.859,.847,.834,.821,.807,.792,.776,.760,.743,.725,.706,.686],
+  [53,.945,.939,.933,.925,.918,.910,.901,.891,.881,.870,.859,.846,.833,.820,.805,.789,.773,.756,.738,.719,.700],
+  [55,.952,.946,.940,.934,.926,.919,.911,.902,.892,.882,.871,.859,.846,.833,.819,.803,.787,.770,.752,.733,.714],
+  [57,.957,.953,.947,.941,.935,.928,.920,.912,.903,.894,.883,.872,.860,.847,.833,.818,.802,.785,.767,.749,.729],
+  [59,.963,.959,.954,.948,.943,.936,.929,.922,.914,.905,.895,.884,.873,.861,.847,.833,.817,.801,.783,.765,.746],
+  [61,.968,.964,.960,.955,.950,.944,.938,.931,.924,.916,.907,.897,.886,.875,.862,.848,.833,.817,.800,.782,.763],
+  [63,.972,.969,.965,.961,.956,.951,.946,.940,.933,.926,.918,.909,.899,.888,.876,.863,.849,.834,.818,.800,.781],
+  [65,.976,.973,.970,.966,.962,.958,.953,.948,.942,.936,.928,.920,.911,.901,.890,.878,.865,.851,.835,.818,.800]
+]);
+
+function buildJSTable(rows) {
+  // rows: each row = [survivorAge, f_memberAge50, f51, f52 ... f70]
+  // memberAges 50..70
+  const memberAges = [50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70];
+  const out = {};
+  for (const row of rows) {
+    const sAge = row[0];
+    out[sAge] = {};
+    for (let i = 0; i < memberAges.length; i++) {
+      out[sAge][memberAges[i]] = row[i+1];
+    }
+  }
+  return out;
+}
+
+function interpJS(table, survivorAge, memberAge) {
+  const survivorKeys = [45,47,49,51,53,55,57,59,61,63,65].filter(k => table[k]);
+  if (!survivorKeys.length) return 1.0;
+
+  // Clamp
+  const sAgeC = Math.max(survivorKeys[0], Math.min(survivorKeys[survivorKeys.length-1], survivorAge));
+  const mAgeC = Math.max(50, Math.min(70, memberAge));
+
+  // Interpolate survivor age
+  let lo = survivorKeys[0], hi = survivorKeys[survivorKeys.length-1];
+  for (let i = 0; i < survivorKeys.length-1; i++) {
+    if (survivorKeys[i] <= sAgeC && survivorKeys[i+1] >= sAgeC) {
+      lo = survivorKeys[i]; hi = survivorKeys[i+1]; break;
+    }
+  }
+
+  const mAgeFloor = Math.floor(mAgeC);
+  const mAgeCeil  = Math.min(70, mAgeFloor+1);
+  const mFrac = mAgeC - mAgeFloor;
+
+  function getVal(sK, mK) {
+    return (table[sK] && table[sK][mK] != null) ? table[sK][mK] : null;
+  }
+
+  const vLoF = getVal(lo, mAgeFloor);
+  const vLoC = getVal(lo, mAgeCeil);
+  const vHiF = getVal(hi, mAgeFloor);
+  const vHiC = getVal(hi, mAgeCeil);
+
+  if (vLoF == null) return 1.0;
+
+  const vLo = vLoF + (vLoF - (vLoC||vLoF)) * -mFrac;
+  const vHi = vHiF ? vHiF + (vHiF - (vHiC||vHiF)) * -mFrac : vLo;
+  const sFrac = (sAgeC - lo) / (hi - lo || 1);
+  return vLo + (vHi - vLo) * sFrac;
+}
+
+function getOCF(option, memberAge, category, serviceYears, survivorAge) {
+  // For formula: non-protective use min(actual, 62); protective use min(actual, normalAge)
+  let lookupAge;
+  if (option === 'life_only') return 1.0;
+
+  const isProtective = category === 'protective_ss' || category === 'protective_no_ss';
+  if (isProtective) {
+    const normalAge = serviceYears >= 25 ? 53 : 54;
+    lookupAge = Math.min(Math.floor(memberAge), normalAge);
+  } else {
+    lookupAge = Math.min(Math.floor(memberAge), 62);
+  }
+  lookupAge = Math.max(55, lookupAge);
+
+  if (option === 'g60')   return OCF_G60_NP[lookupAge] ?? OCF_G60_NP[62];
+  if (option === 'g180')  return OCF_G180_NP[lookupAge] ?? OCF_G180_NP[62];
+
+  const sAge = survivorAge ? Math.floor(survivorAge) : 55;
+  if (option === 'js75')     return interpJS(OCF_JS75, sAge, lookupAge);
+  if (option === 'js100')    return interpJS(OCF_JS100, sAge, lookupAge);
+  if (option === 'js_reduced25') return interpJS(OCF_JS_R25, sAge, lookupAge);
+  if (option === 'js100g180')    return interpJS(OCF_JS100G180, sAge, lookupAge);
+  return 1.0;
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function parseDate(id) {
+  const v = document.getElementById(id).value;
+  return v ? new Date(v + 'T00:00:00') : null;
+}
+
+function yearsBetween(d1, d2) {
+  if (!d1 || !d2) return null;
+  const ms = d2 - d1;
+  return ms / (1000 * 60 * 60 * 24 * 365.25);
+}
+
+function fmt$(n) {
+  return '$' + n.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+
+function fmtYrs(y) {
+  if (y == null) return '—';
+  const yrs = Math.floor(y);
+  const mos = Math.round((y - yrs) * 12);
+  return `${yrs} yrs${mos ? ', ' + mos + ' mo' : ''}`;
+}
+
+function autoCalc() {
+  const dob = parseDate('dob');
+  const retDate = parseDate('retireDate');
+  const wrsStart = parseDate('wrsStart');
+  const now = new Date();
+
+  if (dob) {
+    const age = yearsBetween(dob, now);
+    document.getElementById('derivedAge').textContent = age != null ? fmtYrs(age) : '—';
+  }
+  if (dob && retDate) {
+    const ra = yearsBetween(dob, retDate);
+    document.getElementById('derivedRetireAge').textContent = ra != null ? fmtYrs(ra) : '—';
+  }
+  if (wrsStart && retDate && !document.getElementById('serviceYears').value) {
+    const srv = yearsBetween(wrsStart, retDate);
+    if (srv != null && srv > 0) {
+      document.getElementById('serviceYears').placeholder = `~${srv.toFixed(1)} yrs (from dates)`;
+    }
+  }
+
+  // FAM from salary
+  const salary = parseFloat(document.getElementById('annualSalary').value);
+  if (!isNaN(salary) && salary > 0) {
+    const fam = salary / 12;
+    document.getElementById('derivedFAM').textContent = fmt$(fam) + ' / month';
+  } else {
+    document.getElementById('derivedFAM').textContent = '—';
+  }
+
+  // Survivor age
+  const survivorDOB = parseDate('survivorDOB');
+  if (survivorDOB && retDate) {
+    const sa = yearsBetween(survivorDOB, retDate);
+    document.getElementById('derivedSurvivorAge').textContent = sa != null ? fmtYrs(sa) : '—';
+  }
+}
+
+function toggleEarnings() {
+  const method = document.querySelector('input[name=earningsMethod]:checked').value;
+  document.getElementById('salaryFields').style.display = method === 'salary' ? '' : 'none';
+  document.getElementById('famField').style.display     = method === 'fam'    ? '' : 'none';
+}
+
+function toggleSurvivorAge() {
+  const opt = document.getElementById('annuityOption').value;
+  const needsSurvivor = ['js75','js100','js_reduced25','js100g180'].includes(opt);
+  document.getElementById('survivorAgeField').style.display = needsSurvivor ? '' : 'none';
+}
+
+// ── Main Calculation ───────────────────────────────────────────────────────
+
+function calculate() {
+  const dob       = parseDate('dob');
+  const retDate   = parseDate('retireDate');
+  const wrsStart  = parseDate('wrsStart');
+  const category  = document.getElementById('empCat').value;
+  const option    = document.getElementById('annuityOption').value;
+  const survivorDOB = parseDate('survivorDOB');
+
+  const warnings = [];
+
+  // Age at retirement
+  let retireAge = dob && retDate ? yearsBetween(dob, retDate) : null;
+  if (retireAge == null) {
+    showError('Date of birth and benefit effective date are required.'); return;
+  }
+  retireAge = Math.max(retireAge, 0);
+
+  // Service years
+  let totalService = parseFloat(document.getElementById('serviceYears').value);
+  if (isNaN(totalService) || totalService <= 0) {
+    if (wrsStart && retDate) {
+      totalService = Math.max(0, yearsBetween(wrsStart, retDate));
+    } else {
+      showError('Enter years of creditable service (or provide WRS start date).'); return;
+    }
+  }
+
+  let pre2000   = parseFloat(document.getElementById('pre2000').value) || 0;
+  let post1999  = parseFloat(document.getElementById('post1999').value) || 0;
+  let postAct10 = parseFloat(document.getElementById('postAct10').value) || 0;
+
+  // If user didn't split service, auto-assign to post-1999
+  if (pre2000 === 0 && post1999 === 0 && postAct10 === 0) {
+    post1999 = totalService;
+    warnings.push('Service split not provided — all service assigned to Post-1999 bucket for formula calculation. For more accuracy, enter Pre-2000 / Post-1999 split.');
+  }
+
+  // FAM
+  let fam;
+  const earningsMethod = document.querySelector('input[name=earningsMethod]:checked').value;
+  if (earningsMethod === 'salary') {
+    const salary = parseFloat(document.getElementById('annualSalary').value);
+    if (isNaN(salary) || salary <= 0) { showError('Enter annual salary.'); return; }
+    fam = salary / 12;
+  } else {
+    fam = parseFloat(document.getElementById('manualFAM').value);
+    if (isNaN(fam) || fam <= 0) { showError('Enter final average monthly earnings.'); return; }
+  }
+
+  const variableBalance = parseFloat(document.getElementById('variableBalance').value) || 0;
+  const survivorAge = survivorDOB && retDate ? yearsBetween(survivorDOB, retDate) : null;
+
+  // ── Formula Benefit ──
+  const mults = getMultipliers(category);
+  const arf   = getARF(totalService, retireAge, category);
+
+  const bPre2000  = fam * mults.pre2000  * pre2000  * arf;
+  const bPost1999 = fam * mults.post1999 * post1999 * arf;
+  const bPostA10  = fam * mults.postAct10 * postAct10 * arf;
+  let formulaLifeOnly = bPre2000 + bPost1999 + bPostA10;
+
+  // Maximum benefit check
+  const isProtective = category === 'protective_ss' || category === 'protective_no_ss';
+  let maxPct;
+  if (isProtective) {
+    maxPct = category === 'protective_ss' ? 0.65 : 0.85;
+  } else {
+    maxPct = 0.70;
+  }
+  const maxBenefit = fam * maxPct;
+  if (formulaLifeOnly > maxBenefit) {
+    formulaLifeOnly = maxBenefit;
+    warnings.push(`Formula benefit capped at maximum (${(maxPct*100).toFixed(0)}% of FAM = ${fmt$(maxBenefit)}/mo).`);
+  }
+
+  // Variable adjustment
+  const mpFactor55 = MP_FACTOR[Math.min(80, Math.max(50, Math.round(retireAge)))] || 0.00538;
+  const variableAdj = variableBalance * mpFactor55;
+  const formulaWithVariable = formulaLifeOnly + variableAdj;
+
+  // OCF
+  const ocf = getOCF(option, retireAge, category, totalService, survivorAge);
+  const formulaMonthly = formulaWithVariable * ocf;
+
+  // Normal retirement age check
+  let normalAge;
+  if (category === 'protective_ss' || category === 'protective_no_ss') {
+    normalAge = totalService >= 25 ? 53 : 54;
+  } else if (category === 'elected_pre2017') {
+    normalAge = 62;
+  } else {
+    normalAge = 65;
+  }
+  const minRetireAge = isProtective ? 50 : 55;
+  if (retireAge < minRetireAge) {
+    warnings.push(`Age at retirement (${retireAge.toFixed(1)}) is below minimum eligible age (${minRetireAge}).`);
+  }
+
+  // ── Build results across all ages ──
+  const ageRows = [];
+  for (let a = minRetireAge; a <= normalAge + 5; a++) {
+    if (a > 70) break;
+    const arf_a  = getARF(totalService, a, category);
+    const flo_a  = Math.min(fam * mults.pre2000 * pre2000 * arf_a +
+                            fam * mults.post1999 * post1999 * arf_a +
+                            fam * mults.postAct10 * postAct10 * arf_a, maxBenefit);
+    const varAdj = variableBalance * (MP_FACTOR[Math.min(80,a)] || 0.00538);
+    const withVar = flo_a + varAdj;
+    const ocf_a  = getOCF(option, a, category, totalService, survivorAge);
+    const monthly = withVar * ocf_a;
+    ageRows.push({ age: a, arf: arf_a, flo: flo_a, monthly });
+  }
+
+  // ── Render ──
+  const optLabels = {
+    life_only:   "For Annuitant's Life Only",
+    g60:         "60 Payments Guaranteed",
+    g180:        "180 Payments Guaranteed",
+    js75:        "Joint & Survivor 75%",
+    js100:       "Joint & Survivor 100%",
+    js_reduced25:"Joint & Survivor Reduced 25%",
+    js100g180:   "Joint & Survivor 100% + 180 Guar."
+  };
+
+  let html = '';
+
+  if (warnings.length) {
+    html += warnings.map(w => `<div class="warn-box">⚠ ${w}</div>`).join('');
+  }
+
+  // Primary result cards
+  html += `<div class="result-grid">`;
+  html += `
+    <div class="result-card highlight">
+      <div class="opt-label">${optLabels[option]}</div>
+      <div class="monthly">${fmt$(formulaMonthly)}</div>
+      <div class="annual">${fmt$(formulaMonthly * 12)} / year</div>
+      <div class="method-tag">Formula Method</div>
+    </div>
+    <div class="result-card">
+      <div class="opt-label">For Annuitant's Life Only (base)</div>
+      <div class="monthly">${fmt$(formulaLifeOnly)}</div>
+      <div class="annual">${fmt$(formulaLifeOnly * 12)} / year</div>
+      <div class="method-tag">Before option conversion</div>
+    </div>`;
+  if (Math.abs(variableAdj) > 0.01) {
+    html += `
+    <div class="result-card">
+      <div class="opt-label">With Variable Adjustment</div>
+      <div class="monthly">${fmt$(formulaWithVariable)}</div>
+      <div class="annual">${fmt$(formulaWithVariable * 12)} / year</div>
+      <div class="method-tag">Life Only + Variable</div>
+    </div>`;
+  }
+  html += `</div>`;
+
+  // Calculation steps
+  html += `<div class="calc-steps">
+    <h3>Formula Calculation Steps</h3>
+    <div class="step-row"><span class="step-label">Final Average Monthly Earnings</span><span class="step-val">${fmt$(fam)}</span></div>
+    ${pre2000 > 0 ? `<div class="step-row"><span class="step-label">× Pre-2000 Service (${pre2000} yrs) × ${(mults.pre2000*100).toFixed(3)}%</span><span class="step-val">${fmt$(fam * mults.pre2000 * pre2000)}</span></div>` : ''}
+    ${post1999 > 0 ? `<div class="step-row"><span class="step-label">× Post-1999 Service (${post1999} yrs) × ${(mults.post1999*100).toFixed(2)}%</span><span class="step-val">${fmt$(fam * mults.post1999 * post1999)}</span></div>` : ''}
+    ${postAct10 > 0 ? `<div class="step-row"><span class="step-label">× Post-Act 10 Service (${postAct10} yrs) × ${(mults.postAct10*100).toFixed(2)}%</span><span class="step-val">${fmt$(fam * mults.postAct10 * postAct10)}</span></div>` : ''}
+    <div class="step-row"><span class="step-label">× Age Reduction Factor (age ${retireAge.toFixed(1)}, ${totalService.toFixed(1)} yrs svc)</span><span class="step-val">${arf.toFixed(4)}</span></div>
+    <div class="step-row"><span class="step-label">= Life Only monthly</span><span class="step-val">${fmt$(formulaLifeOnly)}</span></div>
+    ${Math.abs(variableAdj) > 0.01 ? `<div class="step-row"><span class="step-label">± Variable adjustment (${fmt$(variableBalance)} × ${mpFactor55.toFixed(5)})</span><span class="step-val">${fmt$(variableAdj)}</span></div>` : ''}
+    <div class="step-row"><span class="step-label">× Option Conversion Factor (${optLabels[option]})</span><span class="step-val">${ocf.toFixed(4)}</span></div>
+    <div class="step-row total-row"><span class="step-label">= Selected Option Monthly Benefit</span><span class="step-val">${fmt$(formulaMonthly)}</span></div>
+  </div>`;
+
+  // Age comparison table
+  html += `<div class="section-title" style="margin-top:0">Benefit by Retirement Age — ${optLabels[option]}</div>`;
+  html += `<p class="age-range-note">Normal retirement age for your category: <strong>${normalAge}</strong>. Below that age, an age reduction applies.</p>`;
+  html += `<div class="table-wrap"><table>
+    <tr>
+      <th>Retire Age</th>
+      <th>ARF</th>
+      <th>Life Only / mo</th>
+      <th>Selected Option / mo</th>
+      <th>Annual</th>
+    </tr>`;
+  for (const r of ageRows) {
+    const isCurrent = Math.abs(r.age - Math.round(retireAge)) === 0 && Math.round(retireAge) === r.age;
+    html += `<tr${isCurrent ? ' class="best-row"' : ''}>
+      <td>${r.age}${isCurrent ? ' ◀' : ''}</td>
+      <td>${r.arf.toFixed(3)}</td>
+      <td>${fmt$(r.flo)}</td>
+      <td>${fmt$(r.monthly)}</td>
+      <td>${fmt$(r.monthly * 12)}</td>
+    </tr>`;
+  }
+  html += `</table></div>`;
+
+  document.getElementById('resultsPanel').innerHTML = html;
+}
+
+function showError(msg) {
+  document.getElementById('resultsPanel').innerHTML =
+    `<div class="warn-box" style="max-width:500px">⚠ ${msg}</div>`;
+}
+
+// Init
+toggleSurvivorAge();
+</script>
+</body>
+</html>
